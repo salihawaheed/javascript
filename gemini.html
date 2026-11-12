@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormCraft - Modern Drag & Drop Form Builder</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            900: '#064e3b',
+                        },
+                        amber: {
+                            400: '#fbbf24',
+                            500: '#f59e0b',
+                        },
+                        dark: {
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155',
+                            600: '#475569'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
+
+        /* Drag & Drop Visual Styles */
+        .palette-item {
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+        .palette-item:active {
+            cursor: grabbing;
+        }
+        .palette-item.dragging {
+            opacity: 0.4;
+            transform: scale(0.95);
+        }
+
+        .canvas-field {
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+        }
+        .canvas-field.dragging {
+            opacity: 0.3;
+            border: 2px dashed #059669;
+        }
+        .canvas-field.drag-over-top {
+            border-top: 3px solid #059669 !important;
+        }
+        .canvas-field.drag-over-bottom {
+            border-bottom: 3px solid #059669 !important;
+        }
+
+        .drop-zone-active {
+            background-color: rgba(16, 185, 129, 0.05);
+            border-color: #059669 !important;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #059669;
+        }
+
+        /* Custom Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #059669;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #059669;
+        }
+
+        /* Toast Animation */
+        @keyframes slideIn {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        .toast-enter {
+            animation: slideIn 0.3s forwards ease-out;
+        }
+        .toast-exit {
+            animation: fadeOut 0.3s forwards ease-in;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen flex flex-col overflow-hidden">
+
+    <!-- TOP HEADER / ACTION TOOLBAR -->
+    <header class="h-16 bg-slate-800/90 border-b border-slate-700/80 px-4 flex items-center justify-between shrink-0 z-20 backdrop-blur-md">
+        <div class="flex items-center space-x-3">
+            <div class="h-10 w-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/30">
+                <i class="fa-solid fa-wpforms text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight tracking-wide text-emerald-400">FormCraft</h1>
+                <p class="text-xs text-slate-400">Visual Drag & Drop Builder</p>
+            </div>
+        </div>
+
+        <!-- Form Title & Status -->
+        <div class="hidden md:flex items-center space-x-2 bg-slate-900/60 px-4 py-1.5 rounded-lg border border-slate-700/60">
+            <span class="text-xs text-slate-400 font-medium">Form Title:</span>
+            <input type="text" id="formTitleInput" value="Untitled Feedback Form" 
+                class="bg-transparent text-sm font-semibold text-slate-200 focus:outline-none focus:border-emerald-500 border-b border-transparent px-1 transition-all">
+        </div>
+
+        <!-- Header Actions -->
+        <div class="flex items-center space-x-2">
+            <button id="btnSave" title="Save to LocalStorage" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs md:text-sm font-medium flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-floppy-disk text-emerald-400"></i>
+                <span class="hidden sm:inline">Save</span>
+            </button>
+            <button id="btnLoad" title="Load saved form" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs md:text-sm font-medium flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-folder-open text-amber-400"></i>
+                <span class="hidden sm:inline">Load</span>
+            </button>
+            <button id="btnExport" title="Export as JSON" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs md:text-sm font-medium flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-file-export text-cyan-400"></i>
+                <span class="hidden sm:inline">Export</span>
+            </button>
+            <button id="btnImport" title="Import JSON" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs md:text-sm font-medium flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-file-import text-purple-400"></i>
+                <span class="hidden sm:inline">Import</span>
+            </button>
+            <button id="btnClear" title="Clear Canvas" class="px-3 py-2 bg-slate-700 hover:bg-rose-900/60 hover:text-rose-200 text-slate-300 rounded-lg text-xs md:text-sm font-medium flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-trash-can text-rose-400"></i>
+                <span class="hidden sm:inline">Clear</span>
+            </button>
+
+            <div class="h-6 w-px bg-slate-700 mx-1"></div>
+
+            <button id="btnPreview" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition">
+                <i class="fa-solid fa-eye"></i>
+                <span>Live Preview</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN THREE-COLUMN WORKSPACE -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- LEFT SIDEBAR: FIELD PALETTE -->
+        <aside class="w-64 md:w-72 bg-slate-800/60 border-r border-slate-700/70 flex flex-col shrink-0 z-10">
+            <div class="p-4 border-b border-slate-700/60 flex items-center justify-between">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-cubes text-emerald-400"></i> Form Elements
+                </h2>
+                <span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">Drag or Click</span>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                <p class="text-xs text-slate-400 mb-2">Drag elements onto the canvas or tap to insert at bottom.</p>
+
+                <!-- Input Fields Category -->
+                <div class="space-y-2">
+                    <div class="palette-item bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 p-3 rounded-xl flex items-center gap-3 transition cursor-grab group shadow-sm"
+                         draggable="true" data-type="text">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition">
+                            <i class="fa-solid fa-font"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-slate-200">Text Field</div>
+                            <div class="text-[11px] text-slate-400">Single line input</div>
+                        </div>
+                    </div>
+
+                    <div class="palette-item bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 p-3 rounded-xl flex items-center gap-3 transition cursor-grab group shadow-sm"
+                         draggable="true" data-type="email">
+                        <div class="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center group-hover:scale-110 transition">
+                            <i class="fa-solid fa-envelope"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-slate-200">Email Address</div>
+                            <div class="text-[11px] text-slate-400">Email format check</div>
+                        </div>
+                    </div>
+
+                    <div class="palette-item bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 p-3 rounded-xl flex items-center gap-3 transition cursor-grab group shadow-sm"
+                         draggable="true" data-type="number">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition">
+                            <i class="fa-solid fa-hashtag"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-slate-200">Number Input</div>
+                            <div class="text-[11px] text-slate-400">Numeric values</div>
+                        </div>
+                    </div>
+
+                    <div class="palette-item bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 p-3 rounded-xl flex items-center gap-3 transition cursor-grab group shadow-sm"
+                         draggable="true" data-type="textarea">
+                        <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:scale-110 transition">
+                            <i class="fa-solid fa-align-left"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-slate-200">Textarea</div>
+                            <div class="text-[11px] text-slate-400">Multi-line text input</div>
+                        </div>
+                    </div>
+
+                    <div class="palette-item bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 p-3 rounded-xl flex items-center gap-3 transition cursor-grab group shadow-sm"
+                         draggable="true" data-type="dropdown">
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:scale-110 transition">
+                            <i class="fa-solid fa-caret-down"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-slate-200">Dropdown Select</div>
+                            <div class="text-[11px] text-slate-400">Select one option</div>
+                        </div>
+                    </div>
+
+                    <div class="palette-item bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 p-3 rounded-xl flex items-center gap-3 transition cursor-grab group shadow-sm"
+                         draggable="true" data-type="radio">
+                        <div class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center group-hover:scale-110 transition">
+                            <i class="fa-solid fa-circle-dot"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-slate-200">Radio Buttons</div>
+                            <div class="text-[11px] text-slate-400">Single selection group</div>
+                        </div>
+                    </div>
+
+                    <div class="palette-item bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 p-3 rounded-xl flex items-center gap-3 transition cursor-grab group shadow-sm"
+                         draggable="true" data-type="checkbox">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition">
+                            <i class="fa-solid fa-square-check"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-slate-200">Checkboxes</div>
+                            <div class="text-[11px] text-slate-400">Multiple choice selection</div>
+                        </div>
+                    </div>
+
+                    <div class="palette-item bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 p-3 rounded-xl flex items-center gap-3 transition cursor-grab group shadow-sm"
+                         draggable="true" data-type="date">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition">
+                            <i class="fa-solid fa-calendar"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-slate-200">Date Picker</div>
+                            <div class="text-[11px] text-slate-400">Calendar date selector</div>
+                        </div>
+                    </div>
+
+                    <div class="palette-item bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 p-3 rounded-xl flex items-center gap-3 transition cursor-grab group shadow-sm"
+                         draggable="true" data-type="file">
+                        <div class="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center group-hover:scale-110 transition">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-slate-200">File Upload</div>
+                            <div class="text-[11px] text-slate-400">Document / Image drop</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER: BUILDER CANVAS -->
+        <main class="flex-1 bg-slate-950 p-4 md:p-8 overflow-y-auto relative flex flex-col items-center">
+            
+            <!-- Canvas Form Header Box -->
+            <div class="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-amber-500"></div>
+                <div class="space-y-3">
+                    <input type="text" id="canvasFormTitle" value="Untitled Feedback Form"
+                           placeholder="Enter Form Title..."
+                           class="w-full bg-transparent text-2xl font-bold text-slate-100 border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none transition py-1">
+                    <textarea id="canvasFormDesc" rows="2" placeholder="Add a description for your form..."
+                              class="w-full bg-transparent text-sm text-slate-400 border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none transition resize-none">Please fill out this form carefully. All fields marked with * are required.</textarea>
+                </div>
+            </div>
+
+            <!-- Canvas Drop Target Container -->
+            <div id="builderCanvas" class="w-full max-w-3xl min-h-[450px] bg-slate-900/50 border-2 border-dashed border-slate-800 rounded-2xl p-4 md:p-6 transition-all space-y-4 relative">
+                
+                <!-- EMPTY STATE -->
+                <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-slate-500 pointer-events-none">
+                    <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-emerald-400 text-2xl mb-4 shadow-inner">
+                        <i class="fa-solid fa-hand-pointer animate-bounce"></i>
+                    </div>
+                    <h3 class="text-base font-semibold text-slate-300 mb-1">Your canvas is empty</h3>
+                    <p class="text-xs max-w-xs text-slate-400">Drag and drop elements from the left panel, or tap any element to add it here.</p>
+                </div>
+
+                <!-- Dynamic Canvas Field Cards will render here -->
+            </div>
+        </main>
+
+        <!-- RIGHT SIDEBAR: FIELD PROPERTIES EDITOR -->
+        <aside id="propertiesSidebar" class="w-72 md:w-80 bg-slate-800/60 border-l border-slate-700/70 flex flex-col shrink-0 z-10">
+            <div class="p-4 border-b border-slate-700/60 flex items-center justify-between">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-emerald-400"></i> Field Settings
+                </h2>
+                <span id="fieldTypeBadge" class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-semibold hidden">TEXT</span>
+            </div>
+
+            <!-- No Selection State -->
+            <div id="noFieldSelected" class="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500">
+                <i class="fa-solid fa-mouse-pointer text-3xl text-slate-600 mb-3"></i>
+                <p class="text-sm font-medium text-slate-400">No field selected</p>
+                <p class="text-xs text-slate-500 mt-1">Click on any field element in the canvas to customize its options.</p>
+            </div>
+
+            <!-- Active Form Controls (When Field Selected) -->
+            <div id="fieldEditor" class="flex-1 overflow-y-auto p-4 space-y-5 hidden">
+                
+                <!-- Label Setting -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-300">Field Label</label>
+                    <input type="text" id="propLabel" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <!-- Placeholder Setting -->
+                <div id="propPlaceholderGroup" class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-300">Placeholder Text</label>
+                    <input type="text" id="propPlaceholder" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <!-- Help Text Setting -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-300">Help / Subtext</label>
+                    <input type="text" id="propHelpText" placeholder="e.g. We'll never share your data" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <!-- Required Toggle -->
+                <div class="flex items-center justify-between bg-slate-900/60 p-3 rounded-lg border border-slate-700/60">
+                    <span class="text-xs font-semibold text-slate-300">Required Field</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="propRequired" class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                </div>
+
+                <!-- Validation Rules (Min / Max) -->
+                <div id="propValidationGroup" class="space-y-3 pt-2 border-t border-slate-700/60">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Validation Rules</span>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label id="lblMinRule" class="text-[11px] text-slate-400">Min Length</label>
+                            <input type="number" id="propMin" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label id="lblMaxRule" class="text-[11px] text-slate-400">Max Length</label>
+                            <input type="number" id="propMax" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options Editor (For Dropdown, Radio, Checkbox) -->
+                <div id="propOptionsGroup" class="space-y-2 pt-2 border-t border-slate-700/60 hidden">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Options</span>
+                        <button id="btnAddOption" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> Add Option
+                        </button>
+                    </div>
+                    <div id="optionsList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        <!-- Options items injected here -->
+                    </div>
+                </div>
+
+                <!-- Submit Button Text Customization (If Global Selected) -->
+                <div id="propSubmitGroup" class="space-y-1.5 pt-2 border-t border-slate-700/60">
+                    <label class="text-xs font-semibold text-slate-300">Submit Button Text</label>
+                    <input type="text" id="propSubmitText" value="Submit Form" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                </div>
+
+            </div>
+        </aside>
+    </div>
+
+    <!-- LIVE PREVIEW MODAL -->
+    <div id="previewModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <!-- Modal Header -->
+            <div class="px-6 py-4 bg-slate-800/80 border-b border-slate-700 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <h3 class="font-bold text-slate-200 text-base">Live Form Preview</h3>
+                </div>
+                <button id="btnClosePreview" class="text-slate-400 hover:text-white p-1 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form Body -->
+            <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 id="previewFormTitle" class="text-2xl font-bold text-slate-100"></h2>
+                    <p id="previewFormDesc" class="text-sm text-slate-400 mt-1 whitespace-pre-line"></p>
+                </div>
+
+                <form id="liveTestForm" class="space-y-5" novalidate>
+                    <div id="previewFieldsContainer" class="space-y-5">
+                        <!-- Rendered Interactive Preview Fields -->
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-800">
+                        <button type="submit" id="previewSubmitBtn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition">
+                            Submit Form
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Submission Results Viewer -->
+                <div id="submissionResult" class="hidden bg-slate-950 border border-emerald-500/40 rounded-xl p-4 mt-6">
+                    <div class="flex items-center gap-2 text-emerald-400 font-semibold mb-2">
+                        <i class="fa-solid fa-circle-check"></i> Form Submitted Successfully!
+                    </div>
+                    <div class="text-xs text-slate-400 mb-2">Received Form Payload (JSON):</div>
+                    <pre id="payloadOutput" class="bg-slate-900 p-3 rounded-lg text-emerald-300 font-mono text-xs overflow-x-auto border border-slate-800"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON EXPORT / IMPORT MODAL -->
+    <div id="jsonModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl flex flex-col shadow-2xl">
+            <div class="px-6 py-4 bg-slate-800/80 border-b border-slate-700 flex items-center justify-between">
+                <h3 id="jsonModalTitle" class="font-bold text-slate-200 text-base">Export / Import Form Configuration</h3>
+                <button id="btnCloseJson" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p id="jsonModalDesc" class="text-xs text-slate-400">Copy your form JSON configuration below or paste a valid JSON structure to load.</p>
+                <textarea id="jsonArea" rows="10" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 transition"></textarea>
+                <div class="flex justify-end gap-3">
+                    <button id="btnCopyJson" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-copy"></i> Copy Code
+                    </button>
+                    <button id="btnApplyImport" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition hidden">
+                        Apply & Import JSON
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIRMATION DIALOG MODAL -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-5 text-center shadow-2xl space-y-4">
+            <div class="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <h4 id="confirmTitle" class="font-bold text-slate-200 text-base">Are you sure?</h4>
+                <p id="confirmMessage" class="text-xs text-slate-400 mt-1">This action cannot be undone.</p>
+            </div>
+            <div class="flex items-center gap-3 pt-2">
+                <button id="btnCancelConfirm" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition">Cancel</button>
+                <button id="btnOkConfirm" class="flex-1 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- APPLICATION LOGIC IN UNIFIED JS MODULES -->
+    <script>
+        /**
+         * FormCraft - Core Application State & Engines
+         */
+
+        // -------------------------------------------------------------
+        // 1. STATE MANAGEMENT
+        // -------------------------------------------------------------
+        const state = {
+            formMeta: {
+                title: "Untitled Feedback Form",
+                description: "Please fill out this form carefully. All fields marked with * are required.",
+                submitText: "Submit Form"
+            },
+            fields: [],
+            selectedId: null,
+            draggedFieldId: null
+        };
+
+        // -------------------------------------------------------------
+        // 2. STORAGE MODULE
+        // -------------------------------------------------------------
+        const StorageModule = {
+            STORAGE_KEY: "formcraft_saved_form",
+
+            save(data) {
+                try {
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+                    return true;
+                } catch (e) {
+                    console.error("Save error:", e);
+                    return false;
+                }
+            },
+
+            load() {
+                try {
+                    const data = localStorage.getItem(this.STORAGE_KEY);
+                    return data ? JSON.parse(data) : null;
+                } catch (e) {
+                    console.error("Load error:", e);
+                    return null;
+                }
+            }
+        };
+
+        // -------------------------------------------------------------
+        // 3. UTILITY FUNCTIONS
+        // -------------------------------------------------------------
+        function generateId() {
+            return 'field_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const bgClass = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-slate-700';
+            const icon = type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info';
+
+            toast.className = `toast-enter ${bgClass} text-white text-xs px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 pointer-events-auto max-w-sm`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-exit');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        let confirmCallback = null;
+        function showConfirm(title, message, onConfirm) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            document.getElementById('confirmModal').classList.remove('hidden');
+            confirmCallback = onConfirm;
+        }
+
+        // Default Field Factory
+        function createFieldObject(type) {
+            const base = {
+                id: generateId(),
+                type: type,
+                label: 'New ' + type.charAt(0).toUpperCase() + type.slice(1) + ' Field',
+                placeholder: 'Enter ' + type + '...',
+                helpText: '',
+                required: false,
+                validation: { min: '', max: '' }
+            };
+
+            switch (type) {
+                case 'text':
+                    base.label = 'Full Name';
+                    base.placeholder = 'e.g. John Doe';
+                    break;
+                case 'email':
+                    base.label = 'Email Address';
+                    base.placeholder = 'e.g. john@example.com';
+                    break;
+                case 'number':
+                    base.label = 'Age / Quantity';
+                    base.placeholder = '0';
+                    base.validation = { min: 0, max: 100 };
+                    break;
+                case 'textarea':
+                    base.label = 'Comments & Feedback';
+                    base.placeholder = 'Write your response here...';
+                    break;
+                case 'dropdown':
+                    base.label = 'Select Category';
+                    base.options = ['Option 1', 'Option 2', 'Option 3'];
+                    break;
+                case 'radio':
+                    base.label = 'Choose One Option';
+                    base.options = ['Choice A', 'Choice B', 'Choice C'];
+                    break;
+                case 'checkbox':
+                    base.label = 'Select Preferences';
+                    base.options = ['Preference 1', 'Preference 2'];
+                    break;
+                case 'date':
+                    base.label = 'Preferred Date';
+                    break;
+                case 'file':
+                    base.label = 'Upload Attachment';
+                    base.helpText = 'Max size: 5MB (PDF, PNG, JPG)';
+                    break;
+            }
+            return base;
+        }
+
+        // -------------------------------------------------------------
+        // 4. BUILDER ENGINE (RENDER CANVAS & PROPERTIES)
+        // -------------------------------------------------------------
+        const BuilderEngine = {
+            
+            renderCanvas() {
+                const canvas = document.getElementById('builderCanvas');
+                const emptyState = document.getElementById('emptyState');
+                
+                // Remove existing field elements
+                const existingCards = canvas.querySelectorAll('.canvas-field');
+                existingCards.forEach(card => card.remove());
+
+                if (state.fields.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    return;
+                } else {
+                    emptyState.classList.add('hidden');
+                }
+
+                state.fields.forEach((field, index) => {
+                    const card = this.createCanvasFieldCard(field, index);
+                    canvas.appendChild(card);
+                });
+            },
+
+            createCanvasFieldCard(field, index) {
+                const isSelected = field.id === state.selectedId;
+                const wrapper = document.createElement('div');
+                
+                wrapper.className = `canvas-field bg-slate-900 border ${isSelected ? 'border-emerald-500 shadow-md shadow-emerald-500/10' : 'border-slate-800 hover:border-slate-700'} rounded-xl p-4 relative group cursor-pointer`;
+                wrapper.setAttribute('draggable', 'true');
+                wrapper.setAttribute('data-id', field.id);
+                wrapper.setAttribute('data-index', index);
+
+                // Control Toolbar (Duplicate, Delete, Drag Handle)
+                const controlsHtml = `
+                    <div class="absolute top-3 right-3 flex items-center space-x-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="btn-duplicate p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition" title="Duplicate">
+                            <i class="fa-solid fa-clone text-xs"></i>
+                        </button>
+                        <button class="btn-delete p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition" title="Delete">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                        <div class="drag-handle p-1.5 text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing" title="Reorder">
+                            <i class="fa-solid fa-grip-vertical text-xs"></i>
+                        </div>
+                    </div>
+                `;
+
+                // Render Input Preview Preview
+                let inputPreviewHtml = '';
+                const reqStar = field.required ? '<span class="text-rose-500 ml-0.5">*</span>' : '';
+                const help = field.helpText ? `<p class="text-[11px] text-slate-500 mt-1">${field.helpText}</p>` : '';
+
+                switch (field.type) {
+                    case 'text':
+                    case 'email':
+                    case 'number':
+                    case 'date':
+                        inputPreviewHtml = `
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">${field.label}${reqStar}</label>
+                            <input type="${field.type}" placeholder="${field.placeholder || ''}" disabled class="w-full bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-400 pointer-events-none">
+                        `;
+                        break;
+                    case 'textarea':
+                        inputPreviewHtml = `
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">${field.label}${reqStar}</label>
+                            <textarea placeholder="${field.placeholder || ''}" disabled rows="2" class="w-full bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-400 pointer-events-none resize-none"></textarea>
+                        `;
+                        break;
+                    case 'dropdown':
+                        const opts = (field.options || []).map(o => `<option>${o}</option>`).join('');
+                        inputPreviewHtml = `
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">${field.label}${reqStar}</label>
+                            <select disabled class="w-full bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-400 pointer-events-none">
+                                ${opts}
+                            </select>
+                        `;
+                        break;
+                    case 'radio':
+                        const radios = (field.options || []).map(o => `
+                            <label class="flex items-center gap-2 text-xs text-slate-400">
+                                <input type="radio" disabled class="accent-emerald-500"> ${o}
+                            </label>
+                        `).join('');
+                        inputPreviewHtml = `
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">${field.label}${reqStar}</label>
+                            <div class="space-y-1">${radios}</div>
+                        `;
+                        break;
+                    case 'checkbox':
+                        const checks = (field.options || []).map(o => `
+                            <label class="flex items-center gap-2 text-xs text-slate-400">
+                                <input type="checkbox" disabled class="accent-emerald-500 rounded"> ${o}
+                            </label>
+                        `).join('');
+                        inputPreviewHtml = `
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">${field.label}${reqStar}</label>
+                            <div class="space-y-1">${checks}</div>
+                        `;
+                        break;
+                    case 'file':
+                        inputPreviewHtml = `
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">${field.label}${reqStar}</label>
+                            <div class="border border-dashed border-slate-700 bg-slate-950/40 rounded-lg p-3 text-center">
+                                <i class="fa-solid fa-cloud-arrow-up text-slate-500 text-base mb-1"></i>
+                                <div class="text-[11px] text-slate-400">Click or drag file to upload</div>
+                            </div>
+                        `;
+                        break;
+                }
+
+                wrapper.innerHTML = controlsHtml + inputPreviewHtml + help;
+
+                // Bind Card Events
+                wrapper.addEventListener('click', (e) => {
+                    if (e.target.closest('.btn-delete')) {
+                        e.stopPropagation();
+                        BuilderEngine.deleteField(field.id);
+                        return;
+                    }
+                    if (e.target.closest('.btn-duplicate')) {
+                        e.stopPropagation();
+                        BuilderEngine.duplicateField(field.id);
+                        return;
+                    }
+                    BuilderEngine.selectField(field.id);
+                });
+
+                // Canvas Reorder Drag Events
+                wrapper.addEventListener('dragstart', (e) => {
+                    state.draggedFieldId = field.id;
+                    wrapper.classList.add('dragging');
+                    e.dataTransfer.setData('text/plain', field.id);
+                });
+
+                wrapper.addEventListener('dragend', () => {
+                    wrapper.classList.remove('dragging');
+                    document.querySelectorAll('.canvas-field').forEach(c => c.classList.remove('drag-over-top', 'drag-over-bottom'));
+                });
+
+                wrapper.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (state.draggedFieldId === field.id) return;
+
+                    const rect = wrapper.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    
+                    wrapper.classList.remove('drag-over-top', 'drag-over-bottom');
+                    if (e.clientY < midY) {
+                        wrapper.classList.add('drag-over-top');
+                    } else {
+                        wrapper.classList.add('drag-over-bottom');
+                    }
+                });
+
+                wrapper.addEventListener('dragleave', () => {
+                    wrapper.classList.remove('drag-over-top', 'drag-over-bottom');
+                });
+
+                wrapper.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    wrapper.classList.remove('drag-over-top', 'drag-over-bottom');
+
+                    const draggedId = state.draggedFieldId;
+                    if (!draggedId || draggedId === field.id) return;
+
+                    const fromIdx = state.fields.findIndex(f => f.id === draggedId);
+                    let toIdx = index;
+
+                    const rect = wrapper.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    if (e.clientY > midY) {
+                        toIdx++;
+                    }
+
+                    const [movedItem] = state.fields.splice(fromIdx, 1);
+                    if (fromIdx < toIdx) toIdx--;
+                    state.fields.splice(toIdx, 0, movedItem);
+
+                    BuilderEngine.renderCanvas();
+                });
+
+                return wrapper;
+            },
+
+            selectField(id) {
+                state.selectedId = id;
+                this.renderCanvas();
+                this.renderProperties();
+            },
+
+            addField(type) {
+                const newField = createFieldObject(type);
+                state.fields.push(newField);
+                state.selectedId = newField.id;
+                this.renderCanvas();
+                this.renderProperties();
+                showToast(`Added ${type} field`);
+            },
+
+            duplicateField(id) {
+                const idx = state.fields.findIndex(f => f.id === id);
+                if (idx !== -1) {
+                    const original = state.fields[idx];
+                    const clone = JSON.parse(JSON.stringify(original));
+                    clone.id = generateId();
+                    clone.label += ' (Copy)';
+                    state.fields.splice(idx + 1, 0, clone);
+                    state.selectedId = clone.id;
+                    this.renderCanvas();
+                    this.renderProperties();
+                    showToast('Field duplicated');
+                }
+            },
+
+            deleteField(id) {
+                showConfirm('Delete Field', 'Are you sure you want to remove this field?', () => {
+                    state.fields = state.fields.filter(f => f.id !== id);
+                    if (state.selectedId === id) {
+                        state.selectedId = null;
+                    }
+                    this.renderCanvas();
+                    this.renderProperties();
+                    showToast('Field deleted', 'error');
+                });
+            },
+
+            renderProperties() {
+                const noSel = document.getElementById('noFieldSelected');
+                const editor = document.getElementById('fieldEditor');
+                const badge = document.getElementById('fieldTypeBadge');
+
+                const field = state.fields.find(f => f.id === state.selectedId);
+
+                if (!field) {
+                    noSel.classList.remove('hidden');
+                    editor.classList.add('hidden');
+                    badge.classList.add('hidden');
+                    return;
+                }
+
+                noSel.classList.add('hidden');
+                editor.classList.remove('hidden');
+                badge.classList.remove('hidden');
+                badge.textContent = field.type.toUpperCase();
+
+                // Populate Values
+                document.getElementById('propLabel').value = field.label || '';
+                document.getElementById('propPlaceholder').value = field.placeholder || '';
+                document.getElementById('propHelpText').value = field.helpText || '';
+                document.getElementById('propRequired').checked = !!field.required;
+
+                // Handle Placeholder visibility
+                const noPlaceholderTypes = ['radio', 'checkbox', 'date', 'file'];
+                const propPlaceholderGroup = document.getElementById('propPlaceholderGroup');
+                if (noPlaceholderTypes.includes(field.type)) {
+                    propPlaceholderGroup.classList.add('hidden');
+                } else {
+                    propPlaceholderGroup.classList.remove('hidden');
+                }
+
+                // Handle Validation Rules (Min / Max)
+                const valGroup = document.getElementById('propValidationGroup');
+                const lblMin = document.getElementById('lblMinRule');
+                const lblMax = document.getElementById('lblMaxRule');
+                
+                if (field.type === 'text' || field.type === 'textarea') {
+                    valGroup.classList.remove('hidden');
+                    lblMin.textContent = 'Min Length';
+                    lblMax.textContent = 'Max Length';
+                    document.getElementById('propMin').value = field.validation?.min || '';
+                    document.getElementById('propMax').value = field.validation?.max || '';
+                } else if (field.type === 'number') {
+                    valGroup.classList.remove('hidden');
+                    lblMin.textContent = 'Min Value';
+                    lblMax.textContent = 'Max Value';
+                    document.getElementById('propMin').value = field.validation?.min || '';
+                    document.getElementById('propMax').value = field.validation?.max || '';
+                } else {
+                    valGroup.classList.add('hidden');
+                }
+
+                // Handle Options (Dropdown, Radio, Checkbox)
+                const optionsGroup = document.getElementById('propOptionsGroup');
+                if (['dropdown', 'radio', 'checkbox'].includes(field.type)) {
+                    optionsGroup.classList.remove('hidden');
+                    this.renderOptionsList(field);
+                } else {
+                    optionsGroup.classList.add('hidden');
+                }
+            },
+
+            renderOptionsList(field) {
+                const list = document.getElementById('optionsList');
+                list.innerHTML = '';
+
+                (field.options || []).forEach((opt, idx) => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center gap-2';
+                    row.innerHTML = `
+                        <input type="text" value="${opt}" data-idx="${idx}" class="opt-input flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <button data-idx="${idx}" class="btn-del-opt text-slate-500 hover:text-rose-400 p-1">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    `;
+                    list.appendChild(row);
+                });
+
+                // Attach option change events
+                list.querySelectorAll('.opt-input').forEach(inp => {
+                    inp.addEventListener('input', (e) => {
+                        const idx = parseInt(e.target.dataset.idx);
+                        field.options[idx] = e.target.value;
+                        BuilderEngine.renderCanvas();
+                    });
+                });
+
+                list.querySelectorAll('.btn-del-opt').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const idx = parseInt(btn.dataset.idx);
+                        field.options.splice(idx, 1);
+                        BuilderEngine.renderProperties();
+                        BuilderEngine.renderCanvas();
+                    });
+                });
+            }
+        };
+
+        // -------------------------------------------------------------
+        // 5. PREVIEW ENGINE
+        // -------------------------------------------------------------
+        const PreviewEngine = {
+            openModal() {
+                const modal = document.getElementById('previewModal');
+                const title = document.getElementById('previewFormTitle');
+                const desc = document.getElementById('previewFormDesc');
+                const submitBtn = document.getElementById('previewSubmitBtn');
+                const container = document.getElementById('previewFieldsContainer');
+                const resultBox = document.getElementById('submissionResult');
+
+                resultBox.classList.add('hidden');
+                title.textContent = state.formMeta.title || 'Untitled Form';
+                desc.textContent = state.formMeta.description || '';
+                submitBtn.textContent = state.formMeta.submitText || 'Submit Form';
+
+                container.innerHTML = '';
+
+                if (state.fields.length === 0) {
+                    container.innerHTML = `<p class="text-xs text-slate-500 italic text-center py-6">No fields added to this form yet.</p>`;
+                } else {
+                    state.fields.forEach(field => {
+                        const item = this.renderInteractiveField(field);
+                        container.appendChild(item);
+                    });
+                }
+
+                modal.classList.remove('hidden');
+            },
+
+            closeModal() {
+                document.getElementById('previewModal').classList.add('hidden');
+            },
+
+            renderInteractiveField(field) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'space-y-1.5';
+
+                const reqStar = field.required ? '<span class="text-rose-500 ml-0.5">*</span>' : '';
+                const help = field.helpText ? `<p class="text-xs text-slate-500">${field.helpText}</p>` : '';
+                const reqAttr = field.required ? 'required' : '';
+
+                let html = `<label class="block text-xs font-medium text-slate-300">${field.label}${reqStar}</label>`;
+
+                switch (field.type) {
+                    case 'text':
+                    case 'email':
+                        let minMaxAttr = '';
+                        if (field.validation?.min) minMaxAttr += ` minlength="${field.validation.min}"`;
+                        if (field.validation?.max) minMaxAttr += ` maxlength="${field.validation.max}"`;
+                        html += `<input type="${field.type}" name="${field.id}" placeholder="${field.placeholder || ''}" ${reqAttr} ${minMaxAttr}
+                                  class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 transition">`;
+                        break;
+                    case 'number':
+                        let numRange = '';
+                        if (field.validation?.min !== '') numRange += ` min="${field.validation.min}"`;
+                        if (field.validation?.max !== '') numRange += ` max="${field.validation.max}"`;
+                        html += `<input type="number" name="${field.id}" placeholder="${field.placeholder || ''}" ${reqAttr} ${numRange}
+                                  class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 transition">`;
+                        break;
+                    case 'textarea':
+                        let txtMax = field.validation?.max ? `maxlength="${field.validation.max}"` : '';
+                        html += `<textarea name="${field.id}" rows="3" placeholder="${field.placeholder || ''}" ${reqAttr} ${txtMax}
+                                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 transition resize-none"></textarea>`;
+                        break;
+                    case 'dropdown':
+                        const opts = (field.options || []).map(o => `<option value="${o}">${o}</option>`).join('');
+                        html += `
+                            <select name="${field.id}" ${reqAttr} class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                                <option value="">-- Choose an option --</option>
+                                ${opts}
+                            </select>
+                        `;
+                        break;
+                    case 'radio':
+                        const radios = (field.options || []).map(o => `
+                            <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                                <input type="radio" name="${field.id}" value="${o}" ${reqAttr} class="accent-emerald-500"> ${o}
+                            </label>
+                        `).join('');
+                        html += `<div class="space-y-2 pt-1">${radios}</div>`;
+                        break;
+                    case 'checkbox':
+                        const checks = (field.options || []).map(o => `
+                            <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer">
+                                <input type="checkbox" name="${field.id}" value="${o}" class="accent-emerald-500 rounded"> ${o}
+                            </label>
+                        `).join('');
+                        html += `<div class="space-y-2 pt-1">${checks}</div>`;
+                        break;
+                    case 'date':
+                        html += `<input type="date" name="${field.id}" ${reqAttr} class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 transition">`;
+                        break;
+                    case 'file':
+                        html += `<input type="file" name="${field.id}" ${reqAttr} class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20">`;
+                        break;
+                }
+
+                wrapper.innerHTML = html + help;
+                return wrapper;
+            }
+        };
+
+        // -------------------------------------------------------------
+        // 6. APP CONTROLLER (EVENTS & INIT)
+        // -------------------------------------------------------------
+        const AppController = {
+            init() {
+                this.bindFormMetaInputs();
+                this.bindPaletteDragAndClick();
+                this.bindCanvasDropZone();
+                this.bindPropertyEvents();
+                this.bindHeaderActions();
+                this.bindModals();
+
+                // Initial Render
+                BuilderEngine.renderCanvas();
+                BuilderEngine.renderProperties();
+            },
+
+            bindFormMetaInputs() {
+                const titleInp = document.getElementById('formTitleInput');
+                const canvasTitle = document.getElementById('canvasFormTitle');
+                const canvasDesc = document.getElementById('canvasFormDesc');
+
+                // Sync Header Title & Canvas Title
+                titleInp.addEventListener('input', (e) => {
+                    state.formMeta.title = e.target.value;
+                    canvasTitle.value = e.target.value;
+                });
+
+                canvasTitle.addEventListener('input', (e) => {
+                    state.formMeta.title = e.target.value;
+                    titleInp.value = e.target.value;
+                });
+
+                canvasDesc.addEventListener('input', (e) => {
+                    state.formMeta.description = e.target.value;
+                });
+            },
+
+            bindPaletteDragAndClick() {
+                const items = document.querySelectorAll('.palette-item');
+                items.forEach(item => {
+                    item.addEventListener('dragstart', (e) => {
+                        const type = item.dataset.type;
+                        e.dataTransfer.setData('application/type', type);
+                        item.classList.add('dragging');
+                    });
+
+                    item.addEventListener('dragend', () => {
+                        item.classList.remove('dragging');
+                    });
+
+                    // Click to add fallback for Mobile / Fast creation
+                    item.addEventListener('click', () => {
+                        const type = item.dataset.type;
+                        BuilderEngine.addField(type);
+                    });
+                });
+            },
+
+            bindCanvasDropZone() {
+                const canvas = document.getElementById('builderCanvas');
+
+                canvas.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    canvas.classList.add('drop-zone-active');
+                });
+
+                canvas.addEventListener('dragleave', () => {
+                    canvas.classList.remove('drop-zone-active');
+                });
+
+                canvas.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    canvas.classList.remove('drop-zone-active');
+
+                    const type = e.dataTransfer.getData('application/type');
+                    if (type) {
+                        BuilderEngine.addField(type);
+                    }
+                });
+            },
+
+            bindPropertyEvents() {
+                document.getElementById('propLabel').addEventListener('input', (e) => {
+                    const field = state.fields.find(f => f.id === state.selectedId);
+                    if (field) {
+                        field.label = e.target.value;
+                        BuilderEngine.renderCanvas();
+                    }
+                });
+
+                document.getElementById('propPlaceholder').addEventListener('input', (e) => {
+                    const field = state.fields.find(f => f.id === state.selectedId);
+                    if (field) {
+                        field.placeholder = e.target.value;
+                        BuilderEngine.renderCanvas();
+                    }
+                });
+
+                document.getElementById('propHelpText').addEventListener('input', (e) => {
+                    const field = state.fields.find(f => f.id === state.selectedId);
+                    if (field) {
+                        field.helpText = e.target.value;
+                        BuilderEngine.renderCanvas();
+                    }
+                });
+
+                document.getElementById('propRequired').addEventListener('change', (e) => {
+                    const field = state.fields.find(f => f.id === state.selectedId);
+                    if (field) {
+                        field.required = e.target.checked;
+                        BuilderEngine.renderCanvas();
+                    }
+                });
+
+                document.getElementById('propMin').addEventListener('input', (e) => {
+                    const field = state.fields.find(f => f.id === state.selectedId);
+                    if (field) {
+                        if (!field.validation) field.validation = {};
+                        field.validation.min = e.target.value;
+                    }
+                });
+
+                document.getElementById('propMax').addEventListener('input', (e) => {
+                    const field = state.fields.find(f => f.id === state.selectedId);
+                    if (field) {
+                        if (!field.validation) field.validation = {};
+                        field.validation.max = e.target.value;
+                    }
+                });
+
+                document.getElementById('btnAddOption').addEventListener('click', () => {
+                    const field = state.fields.find(f => f.id === state.selectedId);
+                    if (field && field.options) {
+                        field.options.push(`Option ${field.options.length + 1}`);
+                        BuilderEngine.renderProperties();
+                        BuilderEngine.renderCanvas();
+                    }
+                });
+
+                document.getElementById('propSubmitText').addEventListener('input', (e) => {
+                    state.formMeta.submitText = e.target.value;
+                });
+            },
+
+            bindHeaderActions() {
+                // Save to LocalStorage
+                document.getElementById('btnSave').addEventListener('click', () => {
+                    const success = StorageModule.save(state);
+                    if (success) {
+                        showToast('Form saved to LocalStorage!');
+                    } else {
+                        showToast('Failed to save form', 'error');
+                    }
+                });
+
+                // Load from LocalStorage
+                document.getElementById('btnLoad').addEventListener('click', () => {
+                    const loaded = StorageModule.load();
+                    if (loaded) {
+                        state.formMeta = loaded.formMeta || state.formMeta;
+                        state.fields = loaded.fields || [];
+                        state.selectedId = null;
+
+                        document.getElementById('formTitleInput').value = state.formMeta.title;
+                        document.getElementById('canvasFormTitle').value = state.formMeta.title;
+                        document.getElementById('canvasFormDesc').value = state.formMeta.description;
+
+                        BuilderEngine.renderCanvas();
+                        BuilderEngine.renderProperties();
+                        showToast('Form loaded successfully!');
+                    } else {
+                        showToast('No saved form found in storage', 'error');
+                    }
+                });
+
+                // Clear Canvas
+                document.getElementById('btnClear').addEventListener('click', () => {
+                    showConfirm('Clear Canvas', 'Are you sure you want to delete all fields?', () => {
+                        state.fields = [];
+                        state.selectedId = null;
+                        BuilderEngine.renderCanvas();
+                        BuilderEngine.renderProperties();
+                        showToast('Canvas cleared');
+                    });
+                });
+
+                // Export JSON
+                document.getElementById('btnExport').addEventListener('click', () => {
+                    const modal = document.getElementById('jsonModal');
+                    const title = document.getElementById('jsonModalTitle');
+                    const desc = document.getElementById('jsonModalDesc');
+                    const area = document.getElementById('jsonArea');
+                    const applyBtn = document.getElementById('btnApplyImport');
+
+                    title.textContent = "Export Form Configuration JSON";
+                    desc.textContent = "Copy the JSON payload below to share or back up your form design.";
+                    area.value = JSON.stringify(state, null, 2);
+                    area.readOnly = true;
+                    applyBtn.classList.add('hidden');
+
+                    modal.classList.remove('hidden');
+                });
+
+                // Import JSON
+                document.getElementById('btnImport').addEventListener('click', () => {
+                    const modal = document.getElementById('jsonModal');
+                    const title = document.getElementById('jsonModalTitle');
+                    const desc = document.getElementById('jsonModalDesc');
+                    const area = document.getElementById('jsonArea');
+                    const applyBtn = document.getElementById('btnApplyImport');
+
+                    title.textContent = "Import Form Configuration JSON";
+                    desc.textContent = "Paste a valid FormCraft JSON structure into the box below to restore it.";
+                    area.value = "";
+                    area.readOnly = false;
+                    applyBtn.classList.remove('hidden');
+
+                    modal.classList.remove('hidden');
+                });
+
+                // Live Preview
+                document.getElementById('btnPreview').addEventListener('click', () => {
+                    PreviewEngine.openModal();
+                });
+            },
+
+            bindModals() {
+                // Close Preview
+                document.getElementById('btnClosePreview').addEventListener('click', () => {
+                    PreviewEngine.closeModal();
+                });
+
+                // Live Preview Submission Logic
+                document.getElementById('liveTestForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(e.target);
+                    const payload = {};
+
+                    state.fields.forEach(f => {
+                        if (f.type === 'checkbox') {
+                            payload[f.label] = formData.getAll(f.id);
+                        } else if (f.type === 'file') {
+                            const file = formData.get(f.id);
+                            payload[f.label] = file ? file.name || 'No file selected' : 'No file';
+                        } else {
+                            payload[f.label] = formData.get(f.id);
+                        }
+                    });
+
+                    const resBox = document.getElementById('submissionResult');
+                    const out = document.getElementById('payloadOutput');
+
+                    out.textContent = JSON.stringify(payload, null, 2);
+                    resBox.classList.remove('hidden');
+                    showToast('Form submitted successfully!');
+                });
+
+                // JSON Modal Copy & Apply
+                document.getElementById('btnCloseJson').addEventListener('click', () => {
+                    document.getElementById('jsonModal').classList.add('hidden');
+                });
+
+                document.getElementById('btnCopyJson').addEventListener('click', () => {
+                    const area = document.getElementById('jsonArea');
+                    area.select();
+                    document.execCommand('copy');
+                    showToast('JSON copied to clipboard!');
+                });
+
+                document.getElementById('btnApplyImport').addEventListener('click', () => {
+                    const area = document.getElementById('jsonArea');
+                    try {
+                        const parsed = JSON.parse(area.value);
+                        if (parsed && Array.isArray(parsed.fields)) {
+                            state.formMeta = parsed.formMeta || state.formMeta;
+                            state.fields = parsed.fields;
+                            state.selectedId = null;
+
+                            document.getElementById('formTitleInput').value = state.formMeta.title || '';
+                            document.getElementById('canvasFormTitle').value = state.formMeta.title || '';
+                            document.getElementById('canvasFormDesc').value = state.formMeta.description || '';
+
+                            BuilderEngine.renderCanvas();
+                            BuilderEngine.renderProperties();
+                            document.getElementById('jsonModal').classList.add('hidden');
+                            showToast('Form imported successfully!');
+                        } else {
+                            showToast('Invalid form JSON structure', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Syntax Error: Invalid JSON text', 'error');
+                    }
+                });
+
+                // Confirmation Modal Action Buttons
+                document.getElementById('btnCancelConfirm').addEventListener('click', () => {
+                    document.getElementById('confirmModal').classList.add('hidden');
+                    confirmCallback = null;
+                });
+
+                document.getElementById('btnOkConfirm').addEventListener('click', () => {
+                    if (typeof confirmCallback === 'function') {
+                        confirmCallback();
+                    }
+                    document.getElementById('confirmModal').classList.add('hidden');
+                    confirmCallback = null;
+                });
+            }
+        };
+
+        // Initialize Application on DOM Ready
+        window.onload = function() {
+            AppController.init();
+        };
+    </script>
+</body>
+</html>
